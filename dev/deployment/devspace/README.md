@@ -415,7 +415,7 @@ Without that link every image build fails with `unknown flag: --tag`, and only a
 
 ### Pinned tooling
 
-The script installs `darwin-arm64` builds of DevSpace `v6.3.21`, kind `v0.32.0`, kubectl `v1.36.3`, and Helm `v3.21.3` into `$HOME/.nico-devspace/bin`, verifying each published checksum. These are the versions [`setup-devspace-on-host.sh`](setup-devspace-on-host.sh) pins. Helm 3 matters in particular, because the charts are not exercised against Helm 4.
+The script installs `darwin-arm64` builds of DevSpace, kind, kubectl, and Helm into `$HOME/.nico-devspace/bin`, verifying each published checksum. The versions come from [`versions.env`](versions.env), which [`setup-devspace-on-host.sh`](setup-devspace-on-host.sh) and [`prepare-ubuntu-host-for-dev.sh`](prepare-ubuntu-host-for-dev.sh) source as well, so the macOS and Ubuntu paths cannot drift apart. Helm 3 matters in particular, because the charts are not exercised against Helm 4. Run `help` to print the resolved versions.
 
 Nothing in Homebrew's prefix is modified, so that directory has to come first on `PATH` when running `kubectl`, `helm`, or `devspace` by hand:
 
@@ -532,5 +532,6 @@ skipped if neither command is available.
 - [`setup-rest-integration.sh`](setup-rest-integration.sh)
 - [`devspace.yaml`](../../../devspace.yaml)
 - [`values.base.yaml`](values.base.yaml)
+- [`versions.env`](versions.env)
 - `values.generated.yaml`, written by `bootstrap-prereqs.sh` and not tracked
 - [`nuke-postgres.sh`](nuke-postgres.sh)
