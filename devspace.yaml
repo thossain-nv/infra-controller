@@ -198,8 +198,12 @@ images:
     image: localhost:5000/nico-rest-cert-manager
     tags:
       - ${DEVSPACE_GIT_COMMIT}-${DEVSPACE_TIMESTAMP}
-    dockerfile: rest-api/docker/local/Dockerfile.nico-rest-cert-manager
-    context: rest-api
+    # Rust binary from the Cargo workspace, so the context is the repository
+    # root. The Dockerfile copies only the workspace files and crates/.
+    dockerfile: crates/rest-api-cert-manager/Dockerfile
+    context: .
+    buildArgs:
+      VERSION: ${LOCAL_DEV_REST_VERSION}
     buildKit: {}
     skipPush: true
 

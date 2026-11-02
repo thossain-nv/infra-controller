@@ -1,6 +1,6 @@
 # REST command bundle contract
 
-REST has 11 standalone command names, while the production Linux images also
+REST has 10 standalone command names, while the production Linux images also
 need `nicocli` and `nico-mcp`. Building each command in its own job repeated the
 same checkout and Go setup, and it left the Docker builds with no checked bundle
 they could reuse.
@@ -40,10 +40,10 @@ escape a token.
 
 The checked-in inventory has three deliberate boundaries:
 
-- Linux amd64 and Linux arm64 each build 13 commands. The ten production image
+- Linux amd64 and Linux arm64 each build 12 commands. The nine production image
   entrypoints are `api`, `migrations`, `sitemgr`, `workflow`, `site-agent`,
-  `credsmgr`, `flow`, `psm`, `nsm`, and `nico-mcp`. They use the same settings
-  and metadata fields as their production Dockerfiles. Bundle timestamps use
+  `flow`, `psm`, `nsm`, and `nico-mcp`. They use the same settings and metadata
+  fields as their production Dockerfiles. Bundle timestamps use
   canonical UTC values rather than inheriting a runner's local timezone. The
   API image also contains `nicocli`; both `nicocli` and `nico-mcp` are
   Linux-only bundle outputs.
@@ -51,16 +51,22 @@ The checked-in inventory has three deliberate boundaries:
   Linux amd64 builds use CGO, while the cross-compiled Linux arm64 builds do
   not. That amd64 target therefore needs a working C compiler; build metadata,
   rather than `file` wording, verifies its `CGO_ENABLED=1` setting.
-- Darwin arm64 keeps the previous 11-command standalone contract. The API,
+- Darwin arm64 keeps the previous standalone contract of 10 commands. The API,
   site-agent, and flow commands keep their runtime version metadata without
   acquiring Linux static-linker flags or new CLI/MCP builds.
 
 All three targets build `api`, `migrations`, `sitemgr`, `workflow`,
-`site-agent`, `mock-core`, `mock-flow`, `credsmgr`, `flow`, `psm`, and `nsm`.
-The two Linux targets also build `nicocli` and `nico-mcp`. The independent
+`site-agent`, `mock-core`, `mock-flow`, `flow`, `psm`, and `nsm`. The two Linux
+targets also build `nicocli` and `nico-mcp`. The independent
 command-contract test pins the exact package, target, CGO, linker-flag, and
 output inventory; the source manifest remains the canonical machine-readable
 list.
+
+The `nico-rest-cert-manager` image entrypoint is outside this bundle. It is the
+Rust binary `nico-rest-cert-manager` from the Cargo workspace
+([`crates/rest-api-cert-manager`](../../crates/rest-api-cert-manager/)),
+which this Go-only script cannot build. Its image build compiles it, and Core CI
+builds and tests the crate with the rest of the workspace.
 
 The supported transition boundary is
 [CICD-08](https://github.com/NVIDIA/infra-controller/issues/4582). Until that
@@ -175,7 +181,8 @@ modes, paths, inventory, and contents described above.
 ## Embedded metadata
 
 The Linux and Darwin `api` and `site-agent` builds set `metadata.Version` to
-`--version` and `metadata.BuildTime` to `YYYY-MM-DD HH:MM:SS`. Their `flow`
+`--version` and `metadata.BuildTime` to `YYYY-MM-DD HH:MM:SS`. Their `sitemgr`
+builds set the Site Manager's `metadata.Version` to `--version`. Their `flow`
 builds set `metadata.Version` to `--version`, `metadata.BuildTime` to
 `YYYY-MM-DDTHH:MM:SSZ`, and `metadata.GitCommit` to `--short-sha`. Their full Go
 symbol paths live in the source manifest and are pinned by the command-contract

@@ -5,7 +5,7 @@ Components deployed:
   - nico-rest-common (common secrets + temporal-client-cloud-cert)
 {{- end }}
 {{- if index .Values "nico-rest-cert-manager" "enabled" }}
-  - nico-rest-cert-manager (credential manager / credsmgr)
+  - nico-rest-cert-manager (certificate manager)
 {{- end }}
 {{- if index .Values "nico-rest-api" "enabled" }}
   - nico-rest-api (REST API server, port 8388)
@@ -48,12 +48,12 @@ Prerequisites (must exist before install):
 {{- else }}
 {{- if $certManager.enabled }}
   - Secret: {{ $signingSecret }} in namespace {{ $signingNamespace }} (CA cert+key that
-    signs the credsmgr listener — provisioned by Vault or setup-local.sh)
+    signs the cert manager's TLS listener — provisioned by Vault or setup-local.sh)
 {{- end }}
 {{- if $siteManager.enabled }}
   - Secret: {{ $trustedSecret }} in namespace {{ $trustedNamespace }} (certificate of the
-    CA that signs the credsmgr listener — nico-rest-site-manager reads it to verify
-    that endpoint)
+    CA that signs the cert manager's TLS listener — nico-rest-site-manager reads it to
+    verify that endpoint)
 {{- end }}
 {{- end }}
 {{- if not (index .Values "nico-rest-common" "enabled") }}

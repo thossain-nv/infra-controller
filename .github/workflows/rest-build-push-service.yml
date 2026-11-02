@@ -27,6 +27,11 @@ on:
         description: 'Path to Dockerfile'
         required: true
         type: string
+      context:
+        description: 'Docker build context (the rest-api module for Go services; the repository root for the Rust nico-rest-cert-manager)'
+        required: false
+        default: './rest-api'
+        type: string
       semantic_version:
         description: 'Semantic version from VERSION file'
         required: true
@@ -170,13 +175,14 @@ jobs:
       - name: Build ${{ inputs.service_name }} (${{ matrix.arch }})
         uses: docker/build-push-action@v5
         with:
-          context: ./rest-api
+          context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           platforms: ${{ matrix.platform }}
           push: false
           load: true
           # The Dockerfile builder is FROM --platform=$BUILDPLATFORM and cross-compiles via
-          # GOARCH=$TARGETARCH. On a NATIVE single-platform build BuildKit does not inject the
+          # GOARCH=$TARGETARCH (or, for the Rust cert manager, the Rust target triple for
+          # TARGETARCH). On a NATIVE single-platform build BuildKit does not inject the
           # automatic TARGETARCH, so it falls back to the Dockerfile default (amd64) and the
           # arm64 leg cross-compiles to amd64 even on an arm64 runner. Set it explicitly.
           build-args: |
@@ -189,8 +195,9 @@ jobs:
           # dominated the Actions cache and held it at quota, which stopped
           # sccache writing: the Rust builds logged a write error for every miss,
           # discarding everything they compiled. Rebuilding Go layers costs less
-          # than that. cache-from goes too, since nothing populates the scope
-          # once main stops exporting.
+          # than that; the Rust nico-rest-cert-manager image likewise compiles its
+          # dependency tree from scratch on every run. cache-from goes too, since
+          # nothing populates the scope once main stops exporting.
           cache-from: ''
           cache-to: ''
           labels: |

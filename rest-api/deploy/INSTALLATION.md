@@ -247,10 +247,10 @@ kubectl apply -k deploy/kustomize/base/keycloak -n nico-rest
 
 ### What it is
 
-`nico-rest-cert-manager` is the internal PKI microservice (also referred as `credsmgr`). It uses native Go PKI to vend mTLS certificates for components over HTTPS, primarily for dynamic/external entities e.g. Site Agents. When the `site-manager` receives a new site registration, it calls `nico-rest-cert-manager` service to issue the client certificates `site-agent` will use to authenticate. It exposes two ports:
+`nico-rest-cert-manager` is the internal PKI microservice. It is a Rust binary, built from [`crates/rest-api-cert-manager`](../../crates/rest-api-cert-manager/), that replaced the Go service formerly called `credsmgr`. It signs mTLS certificates with the CA in `ca-signing-secret` and vends them over HTTPS, primarily for dynamic/external entities e.g. Site Agents. When the `site-manager` receives a new site registration, it calls `nico-rest-cert-manager` service to issue the client certificates `site-agent` will use to authenticate. It exposes two ports:
 
-- **8000** (HTTPS) — certificate issuance API
-- **8001** (HTTP) — health and liveness endpoint
+- **8000** (HTTPS) — certificate issuance (`POST /v1/pki/cloud-cert`), the CA certificate (`/v1/pki/ca`, `/v1/pki/ca/pem`), `/healthz`, `/version`, and Prometheus `/metrics`. Each request to these routes is counted in `/metrics`, gets a trace span, and logs one `level=SPAN` line. The listener's own certificate is issued from the CA at startup and held in memory.
+- **8001** (HTTP) — `/healthz`, which the readiness and liveness probes use, and the CA certificate (`/v1/pki/ca`, `/v1/pki/ca/pem`). Requests on this port are not logged, metered, or traced.
 
 ### Manifests
 
@@ -258,20 +258,29 @@ kubectl apply -k deploy/kustomize/base/keycloak -n nico-rest
 |---|---|
 | `base/cert-manager/deployment.yaml` | Deployment `nico-rest-cert-manager` — mounts `ca-signing-secret` |
 | `base/cert-manager/service.yaml` | ClusterIP Service — ports 8000 (https) and 8001 (http) |
-| `base/cert-manager/rbac.yaml` | ServiceAccount only — `credsmgr` never calls the Kubernetes API, so it carries no Role and disables token automount |
+| `base/cert-manager/rbac.yaml` | ServiceAccount only — the cert manager never calls the Kubernetes API, so it carries no Role and disables token automount |
 
 ### CLI flags (set in `deployment.yaml`)
 
-| Flag | Default | Description |
+| Flag | Value | Description |
 |---|---|---|
 | `--ca-cert-file` | `/etc/pki/ca/tls.crt` | Path to CA cert (from `ca-signing-secret`) |
 | `--ca-key-file` | `/etc/pki/ca/tls.key` | Path to CA key (from `ca-signing-secret`) |
-| `--ca-common-name` | `NICo Local Dev CA` | CN stamped on the CA |
-| `--ca-organization` | `NVIDIA` | Organization stamped on the CA |
+| `--ca-common-name` | `NICo Local Dev CA` | Accepted for compatibility; has no effect, because the CA comes from `ca-signing-secret` |
+| `--ca-organization` | `NVIDIA` | Accepted for compatibility; has no effect |
 | `--tls-port` | `8000` | HTTPS listen port |
-| `--insecure-port` | `8001` | HTTP health port |
+| `--insecure-port` | `8001` | HTTP port for health checks and the CA certificate |
 | `--ca-base-dns` | `nico.local` | DNS suffix used in issued certs |
 | `--dns-name` | the Service's four in-cluster names plus `localhost` | SAN stamped on the HTTPS listener's own certificate |
+| `--debug` | set | Raises the cert manager's own log level to `debug` |
+
+`--sentry-dsn` and its `SENTRY_DSN` environment variable are deprecated and
+ignored; a non-empty value logs one warning at startup.
+
+The `METRICS_NAMESPACE` environment variable, which the manifests do not set,
+replaces the `nico_rest_cert_manager` prefix of the `/metrics` families when it
+is non-empty. It must match `[a-zA-Z_:][a-zA-Z0-9_:]*`; any other value stops
+startup with an `invalid metrics namespace` error.
 
 `--dns-name` is repeatable, and the first value supplied replaces the built-in
 default (`credsmgr.csm` and `localhost`, the latter matching site-manager's own

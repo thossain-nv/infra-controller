@@ -90,7 +90,7 @@ A NICo REST service used for site-level management and Site Agent bootstrap flow
 
 ### Certificate Manager
 
-A NICo REST certificate-management component used by the REST deployment. Current deployment artifacts in this repo still refer to the component and issuer with names such as `nico-rest-cert-manager` and `nico-rest-ca-issuer`. The REST repository also contains a native certificate manager that issues certificates using Go crypto and integrates with cert-manager.io.
+A NICo REST certificate-management component used by the REST deployment. Current deployment artifacts in this repo still refer to the component and issuer with names such as `nico-rest-cert-manager` and `nico-rest-ca-issuer`. The `nico-rest-cert-manager` service is a Rust binary (`crates/rest-api-cert-manager`) that issues certificates from the REST CA. The `nico-rest-ca-issuer` cert-manager.io ClusterIssuer signs with the same CA.
 
 ### Database Migrations
 

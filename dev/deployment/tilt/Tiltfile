@@ -863,6 +863,7 @@ core_images = [
     ('nico-dhcp', 'dhcp'),
     ('machine-a-tron', 'machine-a-tron'),
     ('nico-ssh-console', 'ssh-console'),
+    ('localhost/nico-rest-cert-manager', 'rest-cert-manager'),
 ]
 if enable_mat_gateway:
     core_images.append(('mat-protocol-gateway', 'mat-protocol-gateway'))
@@ -899,7 +900,6 @@ rest_image(
         'site-workflow',
         'ipam',
         'site-manager',
-        'cert-manager',
         'openapi',
         'cli',
     ],
@@ -915,13 +915,12 @@ rest_image(
         'site-workflow',
         'proto',
         'site-manager',
-        'cert-manager',
     ],
 )
 rest_image(
     'nico-rest-site-manager',
     'Dockerfile.nico-rest-site-manager',
-    ['site-manager', 'cert-manager', 'common'],
+    ['site-manager', 'common'],
 )
 rest_image(
     'nico-rest-site-agent',
@@ -932,18 +931,12 @@ rest_image(
         'site-manager',
         'proto',
         'site-workflow',
-        'cert-manager',
     ],
 )
 rest_image(
     'nico-rest-db',
     'Dockerfile.nico-rest-db',
     ['common', 'db', 'proto', 'ipam'],
-)
-rest_image(
-    'nico-rest-cert-manager',
-    'Dockerfile.nico-rest-cert-manager',
-    ['common', 'cert-manager'],
 )
 rest_image(
     'nico-mcp',

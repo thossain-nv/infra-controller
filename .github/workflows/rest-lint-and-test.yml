@@ -226,7 +226,6 @@ jobs:
         module:
           - api
           - auth
-          - cert-manager
           - common
           - db
           - flow

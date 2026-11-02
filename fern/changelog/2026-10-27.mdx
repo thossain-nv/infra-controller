@@ -1,0 +1,44 @@
+---
+tags: ["unreleased", "rest-api", "deployment", "telemetry"]
+---
+
+## REST Cert Manager rewritten in Rust (unreleased)
+
+The REST Cert Manager, `nico-rest-cert-manager`, is now a Rust binary built from `crates/rest-api-cert-manager` in the Cargo workspace. It replaces the Go `credsmgr` service and keeps the same deployment and REST contract:
+
+- The image name `nico-rest-cert-manager`, the TLS port `8000`, and the plain-HTTP port `8001` are unchanged.
+- The Helm chart and Kustomize base keep their arguments, value keys, labels, ports, and probes.
+- Every `--flag` and environment variable keeps its name and default. The `--dns-name` default stays `credsmgr.csm,localhost`.
+- Every route keeps its status codes and response bodies, including the `CredsManager error, internal code 9` body that `GET /v1/pki/ca` returns when the CA file's first PEM block is not a `CERTIFICATE`. Only the matching of unusual request paths and the answer to some malformed request bodies changed; see Request paths and Request bodies below.
+- `/metrics` keeps the `<namespace>_http_duration_seconds`, `<namespace>_http_request_counts`, and `<namespace>_http_requests_total` families and their labels. A non-empty `METRICS_NAMESPACE` still replaces the `nico_rest_cert_manager` prefix.
+- Both listeners keep the `5s` limits on the TLS handshake and on each request head, and shutdown still drains connections for up to `3s`. The `10s` write and `120s` idle limits now apply to each socket read or write, and an idle HTTP/1.1 keep-alive connection closes after `5s`. See Connection timeouts below.
+
+### Before upgrading
+
+<Warning title="Entrypoint and NGC binary renamed">
+The image entrypoint moves from `/app/credsmgr` to `/app/nico-rest-cert-manager`. The Helm chart and Kustomize base set only container arguments, so they are unaffected. Update any `command:` override that names `/app/credsmgr`.
+
+The `nico-rest-cert-manager-binary-amd64` and `nico-rest-cert-manager-binary-arm64` NGC resources keep their names, but the file inside is now `nico-rest-cert-manager-<arch>` instead of `credsmgr-<arch>`. It is a dynamically linked glibc binary built on Debian 12, not a static Go binary.
+</Warning>
+
+<Warning title="Tracing now uses OTLP/gRPC">
+The Cert Manager now exports spans through the same Rust setup as nico-pxe. It exports only when `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT` is set, always over plaintext OTLP/gRPC. It ignores `OTEL_EXPORTER_OTLP_PROTOCOL`, so an `extraEnv` endpoint on a collector's OTLP/HTTP port `4318` must move to the gRPC port, usually `4317`. `service.name` is always `nico-rest-cert-manager`, only W3C `traceparent` and `tracestate` are propagated, and `NICO_TRACES_SPAN_LEVEL` sets the exported span level. See [nico-rest-cert-manager tracing](../../docs/observability/tracing.md#nico-rest-cert-manager-tracing).
+</Warning>
+
+### Changed behavior
+
+| Area | Change |
+| --- | --- |
+| `--sentry-dsn` / `SENTRY_DSN` | Deprecated and ignored. A non-empty value logs one warning at startup. Site Manager treats the option the same way. |
+| `--debug` | Raises the Cert Manager's own log level to `debug`. The Go service accepted the flag but never applied it. |
+| `METRICS_NAMESPACE` | Must be a valid Prometheus metric name prefix, matching `[a-zA-Z_:][a-zA-Z0-9_:]*`. Any other value, such as `nico-rest-cert-manager`, stops startup with exit code `1` and an `invalid metrics namespace` error. The Go service started and served the names with invalid characters replaced by underscores. |
+| `/metrics` | The Go runtime and process series (`go_*`, `process_*`, and `promhttp_*`) are no longer exposed. Responses are always in the Prometheus text format, without gzip; protobuf and OpenMetrics are not offered. |
+| `--help` and `--version` | Name the program `NICo REST Cert Manager` instead of `NICo Credentials Service`. |
+| Logs | Written as logfmt lines with `component=nico-rest-cert-manager`, like the Core services, instead of logrus text. Each request to a matched route on the TLS listener, including every `/metrics` scrape, writes one `level=SPAN` line with its method, route, status, and peer address at the default `INFO` log level, where the Go service wrote no line per request. Requests on the plain-HTTP listener, which the kubelet probes use, are not logged. |
+| Connection timeouts | A connection that runs out of time is closed without a response, where the Go service answered a TLS request whose head timed out with `400`. An idle HTTP/1.1 keep-alive connection is closed after `5s` instead of `120s`, because the request head limit also covers the wait for the next request. The `10s` write limit applies to each write that waits for the client, not to the whole response, so a client that reads slowly but steadily is not cut off. On HTTP/2, a write that waits too long closes the whole connection, while the Go service reset only that stream. An HTTP/2 connection is dropped without GOAWAY once the client has sent nothing for `120s`, where the Go service sent GOAWAY after `120s` without a request. A TLS client that sends nothing after the handshake is closed after `120s` instead of `5s`, and one that sends the HTTP/2 preface without a SETTINGS frame after `120s` instead of `2s`. A TLS client that skips ALPN and opens with the HTTP/2 preface is now served over HTTP/2. |
+| Request paths | Matched as sent. A path that the Go service redirected with `301` after cleaning it, such as `/v1//pki/ca`, or matched after percent-decoding it, such as `/v1/pki/c%61`, now returns `404`. `OPTIONS *` over HTTP/1.1 also returns `404` instead of `200`. |
+| Request bodies | A `POST /v1/pki/cloud-cert` key, `name`, or `app` with invalid UTF-8 or an unpaired `\u` surrogate escape returns `400`. The Go service replaced those characters with `U+FFFD`. It then ignored such a key and answered `200`, while such a `name` or `app` failed issuance with `500`. A body that stalls after a first value that is not an object or array returns `503` after `5s`, where the Go service answered `200` or `400`. On HTTP/2, a stream that ends short of its `content-length` is reset with `PROTOCOL_ERROR`, where the Go service answered `200`. |
+| TLS | TLS 1.2 offers only AEAD cipher suites, so the two ECDHE-RSA AES-CBC-SHA suites are gone. Key exchange no longer offers P-521 or the P-256 and P-384 ML-KEM hybrids. TLS versions, ALPN, and the TLS 1.3 cipher suites are unchanged. |
+| Serving certificate | Held in memory. `/tmp/svc.cert` and `/tmp/svc.key` are no longer written. |
+| Image | Built on a digest-pinned `gcr.io/distroless/cc-debian12` base. It runs as UID and GID `1000` and declares ports `8000` and `8001`. |
+| REST command bundle | `rest-command-bundle-<target>.tar.gz` no longer contains `bin/credsmgr`. Linux bundles hold 12 commands and the Darwin bundle 10. |

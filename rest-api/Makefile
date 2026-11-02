@@ -3,7 +3,7 @@
 
 .PHONY: test postgres-up postgres-down ensure-postgres postgres-wait clean check-source-headers fix-source-headers check-command-bundle
 .PHONY: build docker-build docker-build-local
-.PHONY: test-ipam test-site-agent test-site-manager test-workflow test-db test-api test-auth test-common test-cert-manager test-site-workflow test-flow test-powershelf-manager test-nvswitch-manager test-proto test-sdk-simple test-mcp migrate core-mock-server-build core-mock-server-start core-mock-server-stop flow-mock-server-build flow-mock-server-start flow-mock-server-stop
+.PHONY: test-ipam test-site-agent test-site-manager test-workflow test-db test-api test-auth test-common test-site-workflow test-flow test-powershelf-manager test-nvswitch-manager test-proto test-sdk-simple test-mcp migrate core-mock-server-build core-mock-server-start core-mock-server-stop flow-mock-server-build flow-mock-server-start flow-mock-server-stop
 .PHONY: validate-openapi preview-openapi generate-client
 .PHONY: core-proto core-proto-clean core-proto-fetch core-proto-fmt core-protogen flow-proto flow-protogen tools-build tools-clean
 .PHONY: pre-commit-install pre-commit-run pre-commit-update
@@ -29,6 +29,10 @@ LOCAL_REGISTRY_CONTAINER := nico-build-registry
 REST_IMAGES := nico-rest-api nico-rest-workflow nico-rest-site-manager \
 	nico-rest-site-agent nico-rest-db nico-rest-cert-manager nico-flow \
 	nico-psm nico-nsm nico-mcp
+# The Cert Manager is a Rust binary in the Cargo workspace, so its one
+# Dockerfile (production and local) builds with the monorepo root as context.
+CERT_MANAGER_DOCKERFILE := ../crates/rest-api-cert-manager/Dockerfile
+CERT_MANAGER_CONTEXT := ..
 
 # PostgreSQL container configuration
 POSTGRES_CONTAINER_NAME := project-test
@@ -224,9 +228,6 @@ test-auth:
 test-common:
 	cd common && go test -p 1 ./... -count=1
 
-test-cert-manager:
-	cd cert-manager && go test -p 1 ./... -count=1
-
 test-site-workflow:
 	cd site-workflow && go test -p 1 ./... -count=1
 
@@ -266,7 +267,7 @@ test-sdk-simple:
 test-mcp:
 	cd mcp && go test -p 1 ./... -count=1
 
-test: test-ipam test-db test-api test-auth test-common test-cert-manager test-site-workflow test-site-manager test-workflow test-site-agent test-flow test-powershelf-manager test-nvswitch-manager test-proto test-sdk-simple test-mcp
+test: test-ipam test-db test-api test-auth test-common test-site-workflow test-site-manager test-workflow test-site-agent test-flow test-powershelf-manager test-nvswitch-manager test-proto test-sdk-simple test-mcp
 
 build:
 	mkdir -p $(BUILD_DIR)
@@ -276,7 +277,6 @@ build:
 	cd site-manager && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags '-static'" -o ../$(BUILD_DIR)/sitemgr ./cmd/sitemgr
 	cd site-agent && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags '-static'" -o ../$(BUILD_DIR)/site-agent ./cmd/site-agent
 	cd db && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags '-static'" -o ../$(BUILD_DIR)/migrations ./cmd/migrations
-	cd cert-manager && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags '-static'" -o ../$(BUILD_DIR)/credsmgr ./cmd/credsmgr
 	cd cli && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags '-static'" -o ../$(BUILD_DIR)/nicocli ./cmd/cli
 	cd mcp && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags '-static'" -o ../$(BUILD_DIR)/nico-mcp ./cmd/nico-mcp
 
@@ -304,12 +304,18 @@ docker-build:
 	@set -e; \
 	for image in $(REST_IMAGES); do \
 		tags=""; \
+		dockerfile=$(DOCKERFILE_DIR)/Dockerfile.$$image; \
+		context=.; \
+		if [ "$$image" = "nico-rest-cert-manager" ]; then \
+			dockerfile=$(CERT_MANAGER_DOCKERFILE); \
+			context=$(CERT_MANAGER_CONTEXT); \
+		fi; \
 		for arch in $(DOCKER_ARCHES); do \
 			tag=$(IMAGE_REGISTRY)/$$image:$(IMAGE_TAG)-$$arch; \
 			docker buildx build --platform linux/$$arch --push \
 				--build-arg TARGETOS=linux --build-arg TARGETARCH=$$arch \
 				-t $$tag \
-				-f $(DOCKERFILE_DIR)/Dockerfile.$$image .; \
+				-f $$dockerfile $$context; \
 			tags="$$tags $$tag"; \
 		done; \
 		docker buildx imagetools create -t $(IMAGE_REGISTRY)/$$image:$(IMAGE_TAG) $$tags; \
@@ -419,7 +425,7 @@ docker-build-local:
 		docker build -t $(IMAGE_REGISTRY)/nico-rest-mock-core:$(IMAGE_TAG) -f $(LOCAL_DOCKERFILE_DIR)/Dockerfile.nico-rest-mock-core . ; \
 	fi
 	docker build -t $(IMAGE_REGISTRY)/nico-rest-db:$(IMAGE_TAG) -f $(LOCAL_DOCKERFILE_DIR)/Dockerfile.nico-rest-db .
-	docker build -t $(IMAGE_REGISTRY)/nico-rest-cert-manager:$(IMAGE_TAG) -f $(LOCAL_DOCKERFILE_DIR)/Dockerfile.nico-rest-cert-manager .
+	docker build -t $(IMAGE_REGISTRY)/nico-rest-cert-manager:$(IMAGE_TAG) -f $(CERT_MANAGER_DOCKERFILE) $(CERT_MANAGER_CONTEXT)
 	docker build -t $(IMAGE_REGISTRY)/nico-mcp:$(IMAGE_TAG) -f $(LOCAL_DOCKERFILE_DIR)/Dockerfile.nico-mcp .
 
 # Create kind cluster with port mappings
@@ -521,7 +527,7 @@ deploy-overlay-workflow:
 
 # Shared infrastructure: cluster, cert-manager.io, PostgreSQL, Temporal, Keycloak,
 # and mock-core (dev only).
-# common secrets and credsmgr are now installed as part of the Helm chart (nico-rest-common,
+# common secrets and the cert manager are now installed as part of the Helm chart (nico-rest-common,
 # nico-rest-cert-manager sub-charts). App services are deployed separately by
 # kind-reset-helm or kind-reset-kustomize.
 kind-reset-infra: docker-build-local
@@ -606,7 +612,7 @@ kind-reset-kustomize: kind-reset-infra
 	kubectl apply -k deploy/kustomize/base/common
 	kubectl -n nico-rest wait --for=condition=Ready certificate/temporal-client-cloud-cert --timeout=240s || true
 
-	@echo "Setting up Nico REST Cert Manager (credsmgr)..."
+	@echo "Setting up Nico REST Cert Manager..."
 	kubectl apply -k deploy/kustomize/overlays/cert-manager
 	kubectl -n nico-rest rollout status deployment/nico-rest-cert-manager --timeout=240s
 

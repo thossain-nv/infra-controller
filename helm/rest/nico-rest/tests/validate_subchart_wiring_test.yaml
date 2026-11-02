@@ -69,7 +69,7 @@ tests:
   - it: rejects SANs that omit the host site-manager dials
     set:
       nico-rest-cert-manager.config.dnsNames:
-        - credsmgr.override.example.com
+        - cert-manager.override.example.com
     asserts:
       - failedTemplate:
           errorPattern: 'covers neither "nico-rest-cert-manager.nico-rest".*nor "\*.nico-rest"'
@@ -103,8 +103,8 @@ tests:
     set:
       nico-rest-cert-manager.namespaceOverride: nico-rest-staging
       nico-rest-cert-manager.config.dnsNames:
-        - credsmgr.override.example.com
-      nico-rest-site-manager.args.credsManagerUrl: https://credsmgr.override.example.com:8000
+        - cert-manager.override.example.com
+      nico-rest-site-manager.args.credsManagerUrl: https://cert-manager.override.example.com:8000
     asserts:
       - hasDocuments:
           count: 0

@@ -205,9 +205,11 @@ jobs:
       ngc_path: ${{ inputs.ngc_path }}
       runner: ${{ inputs.runner }}
       service_name: nico-rest-cert-manager
-      binary_name: credsmgr
-      binary_path: /app/credsmgr
-      dockerfile: ./rest-api/docker/production/Dockerfile.nico-rest-cert-manager
+      binary_name: nico-rest-cert-manager
+      binary_path: /app/nico-rest-cert-manager
+      # Rust binary from the Cargo workspace: the build context is the repository root.
+      dockerfile: ./crates/rest-api-cert-manager/Dockerfile
+      context: .
       semantic_version: ${{ inputs.semantic_version }}
       short_sha: ${{ inputs.short_sha }}
       branch_sha_tag: ${{ inputs.branch_sha_tag }}

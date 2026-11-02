@@ -71,8 +71,8 @@ tests:
   - it: honours an explicit args.credsManagerUrl
     set:
       args:
-        credsManagerUrl: https://credsmgr.override.example.com:8443
+        credsManagerUrl: https://cert-manager.override.example.com:8443
     asserts:
       - contains:
           path: spec.template.spec.containers[0].args
-          content: --creds-manager-url=https://credsmgr.override.example.com:8443
+          content: --creds-manager-url=https://cert-manager.override.example.com:8443

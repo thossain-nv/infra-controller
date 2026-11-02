@@ -115,6 +115,15 @@ RUN --mount=type=cache,id=nico-tilt-cargo-home,target=/cargo-home,sharing=locked
     && mkdir -p /out \
     && sha256sum </cargo-target/debug/nico-postgres-exporter >/out/nico-postgres-exporter.sha256sum
 
+# nico-rest-cert-manager builder
+FROM source AS rest-cert-manager-builder
+
+RUN --mount=type=cache,id=nico-tilt-cargo-home,target=/cargo-home,sharing=locked \
+    --mount=type=cache,id=nico-tilt-cargo-target,target=/cargo-target,sharing=locked \
+    cargo build --locked -p nico-rest-cert-manager --bin nico-rest-cert-manager \
+    && mkdir -p /out \
+    && sha256sum </cargo-target/debug/nico-rest-cert-manager >/out/nico-rest-cert-manager.sha256sum
+
 ### Runtime layers
 
 # api runtime image
@@ -245,3 +254,22 @@ RUN --mount=type=cache,id=nico-tilt-cargo-home,target=/cargo-home,sharing=locked
     && rm /tmp/nico-postgres-exporter.sha256sum
 
 USER 65534:65534
+
+# nico-rest-cert-manager runtime image. The nico-rest-cert-manager chart sets
+# only container arguments, so the image names the entrypoint.
+FROM nico-tilt-runtime-base AS rest-cert-manager
+
+RUN mkdir -p /app
+
+COPY --from=rest-cert-manager-builder /out/nico-rest-cert-manager.sha256sum /tmp/nico-rest-cert-manager.sha256sum
+
+RUN --mount=type=cache,id=nico-tilt-cargo-home,target=/cargo-home,sharing=locked \
+    --mount=type=cache,id=nico-tilt-cargo-target,target=/cargo-target,sharing=locked \
+    cp /cargo-target/debug/nico-rest-cert-manager /app/nico-rest-cert-manager \
+    && test "$(sha256sum < /app/nico-rest-cert-manager)" = "$(cat /tmp/nico-rest-cert-manager.sha256sum)" \
+    && rm /tmp/nico-rest-cert-manager.sha256sum
+
+# The chart runs the pod as UID/GID 1000, like the production image.
+USER 1000:1000
+
+ENTRYPOINT ["/app/nico-rest-cert-manager"]

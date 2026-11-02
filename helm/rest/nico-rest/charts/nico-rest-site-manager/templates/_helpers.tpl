@@ -31,7 +31,7 @@ namespaceOverride and does not move when site-manager's is set. The hostname
 has to be a SAN on that service's certificate, so when cert-manager is the
 subchart being relocated, set args.credsManagerUrl explicitly.
 */}}
-{{- define "nico-rest-site-manager.credsManagerUrl" -}}
+{{- define "nico-rest-site-manager.certManagerUrl" -}}
 {{- if .Values.args.credsManagerUrl -}}
 {{- .Values.args.credsManagerUrl -}}
 {{- else -}}

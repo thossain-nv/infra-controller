@@ -78,8 +78,9 @@ bootstrap: ## Set up an Ubuntu/Debian build host: apt deps, rustup, submodules, 
 # Build NICo container images from a clean clone. Run from the repo root on an
 # Ubuntu build host (see docs/manuals/building_nico_containers.md for the host
 # prerequisites: docker, mkosi, rust, cargo-make, ...). Every base image is
-# public (rust / debian / golang + nvcr.io/nvidia/distroless), so no internal
-# registry access is required.
+# public (rust / debian / golang + nvcr.io/nvidia/distroless, and
+# gcr.io/distroless for the REST cert manager), so no internal registry access
+# is required.
 #
 #   make images        Build the deployable service stack: NICo Core + REST images
 #   make images-arm    Build the deployable service stack for ARM64 only

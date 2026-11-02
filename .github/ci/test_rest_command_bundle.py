@@ -50,7 +50,6 @@ class ManifestTest(unittest.TestCase):
         # explicit test change that a reviewer can see.
         packages = {
             "api": "./api/cmd/api",
-            "credsmgr": "./cert-manager/cmd/credsmgr",
             "flow": "./flow",
             "migrations": "./db/cmd/migrations",
             "mock-core": "./site-agent/cmd/mock-core",
@@ -66,11 +65,8 @@ class ManifestTest(unittest.TestCase):
         static_stripped = ("-extldflags=-static", "-w", "-s")
         static_only = ("-extldflags=-static",)
         metadata_flags = {
-            "credsmgr": (
-                "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}",
-            ),
             "sitemgr": (
-                "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}",
+                "-X=github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/metadata.Version=${VERSION}",
             ),
             "api": (
                 "-X=github.com/NVIDIA/infra-controller/rest-api/api/pkg/metadata.Version=${VERSION}",
@@ -94,7 +90,6 @@ class ManifestTest(unittest.TestCase):
             "site-agent": static_stripped + metadata_flags["site-agent"],
             "mock-core": (),
             "mock-flow": (),
-            "credsmgr": static_stripped + metadata_flags["credsmgr"],
             "flow": static_only + metadata_flags["flow"],
             "nicocli": static_stripped,
             "nico-mcp": static_stripped,
@@ -114,7 +109,7 @@ class ManifestTest(unittest.TestCase):
         }
 
         self.assertEqual(set(self.manifest.targets), set(target_specs))
-        self.assertEqual(len(self.manifest.outputs), 37)
+        self.assertEqual(len(self.manifest.outputs), 34)
         for name, (goos, goarch) in target_specs.items():
             with self.subTest(target=name):
                 target = self.manifest.targets[name]
@@ -527,7 +522,7 @@ class BundleFormatTest(unittest.TestCase):
             False,
         )
         self.assertEqual(target, source.targets["linux-amd64"])
-        self.assertEqual(len(outputs), 13)
+        self.assertEqual(len(outputs), 12)
 
         cases = {
             "wrong target": (
@@ -542,7 +537,7 @@ class BundleFormatTest(unittest.TestCase):
             ),
             "missing output": (
                 lambda changed: changed["outputs"].pop(),
-                "resolved manifest has 12 outputs, expected 13",
+                "resolved manifest has 11 outputs, expected 12",
             ),
             "relabeled output": (
                 lambda changed: changed["outputs"][0].__setitem__(

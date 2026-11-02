@@ -56,6 +56,8 @@ resources:
     cpu: "250m"
 
 # -- Extra container environment, name->value. Mainly for OTEL_* variables:
-# the binary exports traces when OTEL_EXPORTER_OTLP_ENDPOINT (or the traces
-# specific endpoint) is set and otherwise only forwards trace context.
+# the binary exports traces over OTLP/gRPC when OTEL_EXPORTER_OTLP_ENDPOINT (or
+# the traces specific endpoint) is set, and exports nothing otherwise.
+# METRICS_NAMESPACE replaces the nico_rest_cert_manager metric name prefix; a
+# value that does not match [a-zA-Z_:][a-zA-Z0-9_:]* stops the binary at startup.
 extraEnv: {}

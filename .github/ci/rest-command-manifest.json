@@ -53,7 +53,7 @@
         "-extldflags=-static",
         "-w",
         "-s",
-        "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}"
+        "-X=github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/metadata.Version=${VERSION}"
       ],
       "output": "bin/sitemgr"
     },
@@ -98,19 +98,6 @@
       "cgo_enabled": true,
       "ldflags": [],
       "output": "bin/mock-flow"
-    },
-    {
-      "name": "credsmgr",
-      "package": "./cert-manager/cmd/credsmgr",
-      "target": "linux-amd64",
-      "cgo_enabled": false,
-      "ldflags": [
-        "-extldflags=-static",
-        "-w",
-        "-s",
-        "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}"
-      ],
-      "output": "bin/credsmgr"
     },
     {
       "name": "flow",
@@ -204,7 +191,7 @@
         "-extldflags=-static",
         "-w",
         "-s",
-        "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}"
+        "-X=github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/metadata.Version=${VERSION}"
       ],
       "output": "bin/sitemgr"
     },
@@ -249,19 +236,6 @@
       "cgo_enabled": false,
       "ldflags": [],
       "output": "bin/mock-flow"
-    },
-    {
-      "name": "credsmgr",
-      "package": "./cert-manager/cmd/credsmgr",
-      "target": "linux-arm64",
-      "cgo_enabled": false,
-      "ldflags": [
-        "-extldflags=-static",
-        "-w",
-        "-s",
-        "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}"
-      ],
-      "output": "bin/credsmgr"
     },
     {
       "name": "flow",
@@ -345,7 +319,7 @@
       "target": "darwin-arm64",
       "cgo_enabled": false,
       "ldflags": [
-        "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}"
+        "-X=github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/metadata.Version=${VERSION}"
       ],
       "output": "bin/sitemgr"
     },
@@ -383,16 +357,6 @@
       "cgo_enabled": false,
       "ldflags": [],
       "output": "bin/mock-flow"
-    },
-    {
-      "name": "credsmgr",
-      "package": "./cert-manager/cmd/credsmgr",
-      "target": "darwin-arm64",
-      "cgo_enabled": false,
-      "ldflags": [
-        "-X=github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core.Version=${VERSION}"
-      ],
-      "output": "bin/credsmgr"
     },
     {
       "name": "flow",

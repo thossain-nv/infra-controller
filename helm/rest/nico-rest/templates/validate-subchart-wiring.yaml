@@ -31,10 +31,11 @@ with whatever config.caCertFile and config.caKeyFile resolve to, and the
 binary's own defaults are Vault agent paths, so pointing those values off the
 /etc/pki/ca mount this chart provides leaves the listener signed by a CA the
 chart never sees while Site Manager still trusts the mounted Secret. The
-condition below mirrors NewNativeCertificateIssuer: the primary pair is used
-only when both are set, and anything else falls back to the alternate paths,
-which are the mount. Nothing here can discover the real signer, so Site
-Manager's trust has to have been aimed deliberately.
+condition below mirrors the cert manager's CA loading (CertificateAuthority::load
+in crates/rest-api-cert-manager): the primary pair is used only when both are
+set, and anything else falls back to the alternate paths, which are the mount.
+Nothing here can discover the real signer, so Site Manager's trust has to have
+been aimed deliberately.
 */}}
 {{- $certManagerConfig := $certManager.config | default dict -}}
 {{- $siteManagerArgs := $siteManager.args | default dict -}}

@@ -26,9 +26,9 @@ spec:
         {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
       serviceAccountName: nico-rest-cert-manager
       terminationGracePeriodSeconds: 5
-      # 1000 is the `nvs` user the image declares. The image states it by name,
-      # which the kubelet cannot verify, so runAsNonRoot needs the numeric UID
-      # spelled out here. fsGroup makes the tmp volume below writable.
+      # The image runs as UID/GID 1000 (USER 1000:1000). The UID is spelled out
+      # here too, so runAsNonRoot holds for any image tag, including older images
+      # that named their user. fsGroup makes the tmp volume below writable.
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -93,5 +93,8 @@ spec:
         - name: ca-signing-secret
           secret:
             secretName: {{ .Values.secrets.caSigningSecret }}
+        # The cert manager keeps its serving cert in memory. /tmp stays writable
+        # under the read-only root filesystem for images built before the Rust
+        # rewrite, which wrote /tmp/svc.cert and /tmp/svc.key at startup.
         - name: tmp
           emptyDir: {}

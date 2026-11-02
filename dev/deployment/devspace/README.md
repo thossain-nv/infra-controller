@@ -160,7 +160,7 @@ devspace deploy -n nico-system --profile full
 DevSpace will:
 
 - compile the shared Core binaries once with [`Dockerfile.core-artifacts`](Dockerfile.core-artifacts), then build the local runtime images from [`Dockerfile.api`](Dockerfile.api), [`Dockerfile.bmc-proxy`](Dockerfile.bmc-proxy), and [`Dockerfile.machine-a-tron`](Dockerfile.machine-a-tron); the `full` profile also packages PXE with [`Dockerfile.pxe`](Dockerfile.pxe)
-- build the REST API, workflow, site-manager, site-agent, database migration, certificate-manager, and MCP images from [`rest-api/docker/local`](../../../rest-api/docker/local)
+- build the REST API, workflow, site-manager, site-agent, database migration, and MCP images from [`rest-api/docker/local`](../../../rest-api/docker/local), and the REST certificate-manager image from the Rust [`crates/rest-api-cert-manager/Dockerfile`](../../../crates/rest-api-cert-manager/Dockerfile) with the repository root as its context
 - deploy the Helm chart in [`helm/`](../../../helm) (including `nico-machine-a-tron`)
 - deploy the REST umbrella, site-agent, and MCP charts in [`helm/rest`](../../../helm/rest)
 - inject the built image names and DevSpace-generated tags into both deployments at runtime
@@ -373,7 +373,7 @@ DevSpace then deploys the Helm chart with:
 - with `full`, the built `nico-pxe` image wired into the `nico-pxe` chart values
 - certificate issuer settings from the DevSpace environment variables
 
-The REST images are built from the existing `rest-api/docker/local` Dockerfiles and are passed to the three existing REST Helm charts with the same generated tag.
+The REST images are built from the existing `rest-api/docker/local` Dockerfiles, except the certificate manager, which uses `crates/rest-api-cert-manager/Dockerfile`. All are passed to the three existing REST Helm charts with the same generated tag.
 
 ## Resetting the local environment
 

@@ -1,0 +1,85 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+[package]
+name = "nico-rest-cert-manager"
+version = "0.0.0"
+description = "NICo REST Cert Manager: issues TLS certificates from the site CA for NICo REST services"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "nico-rest-cert-manager"
+path = "src/main.rs"
+
+[dependencies]
+# [local-dependencies]
+carbide-instrument = { path = "../instrument", features = ["otlp-tracing"] }
+carbide-version = { path = "../version" }
+logfmt = { path = "../logfmt" }
+metrics-endpoint = { path = "../metrics-endpoint" }
+trace-propagation = { path = "../trace-propagation" }
+# [end-local-dependencies]
+axum = { workspace = true }
+axum-server = { workspace = true, features = ["tls-rustls"] }
+clap = { workspace = true }
+http-body-util = { workspace = true }
+hyper-util = { workspace = true, features = ["server-auto", "tokio"] }
+pem = { workspace = true }
+pkcs1 = { workspace = true, features = ["pem", "pkcs8"] }
+pkcs8 = { workspace = true }
+prometheus = { workspace = true }
+rand = { workspace = true }
+rcgen = { workspace = true, features = ["aws_lc_rs", "pem", "x509-parser"] }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+# `raw_value` lets the request decoder parse `ttl` from its JSON literal. So
+# `-0` is accepted as zero, but `24.0` and `1e2` are rejected.
+serde_json = { workspace = true, features = ["raw_value"] }
+socket2 = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+tokio-io-timeout = { workspace = true }
+tokio-util = { workspace = true }
+tower = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+x509-parser = { workspace = true }
+
+[build-dependencies]
+carbide-version = { path = "../version" }
+
+[dev-dependencies]
+carbide-test-support = { path = "../test-support" }
+futures-util = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
+serial_test = { workspace = true }
+# `all` adds the keepalive getters the tests use to check the accepted
+# sockets' options.
+socket2 = { workspace = true, features = ["all"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+tokio-rustls = { workspace = true }
+tower = { workspace = true, features = ["util"] }
+tracing-opentelemetry = { workspace = true }
+
+[lints]
+workspace = true

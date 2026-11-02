@@ -19,8 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/certs"
-	"github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core"
+	"github.com/NVIDIA/infra-controller/rest-api/site-manager/internal/logger"
 	fakecrdclient "github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/client/clientset/versioned/fake"
 	crdsv1 "github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/crds/v1"
 	"github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/types"
@@ -161,7 +160,7 @@ func (s *Suite) setup() error {
 	})
 
 	rtr.HandleFunc("/v1/pki/cloud-cert", func(w http.ResponseWriter, _ *http.Request) {
-		resp := &certs.CertificateResponse{
+		resp := &certificateResponse{
 			Key:         testKey,
 			Certificate: testCert,
 		}
@@ -306,14 +305,14 @@ func TestManagerCreateSite() (*Suite, error) {
 
 	fcrd := fakecrdclient.NewSimpleClientset()
 	o := Options{
-		credsMgrURL:    fmt.Sprintf("https://%s", ts.l.Addr().String()),
-		credsMgrCAPath: ts.caPath,
-		ingressHost:    "test-host",
-		listenPort:     "0",
-		namespace:      "csm",
+		certManagerURL:    fmt.Sprintf("https://%s", ts.l.Addr().String()),
+		certManagerCAPath: ts.caPath,
+		ingressHost:       "test-host",
+		listenPort:        "0",
+		namespace:         "csm",
 	}
 
-	ctx := core.NewDefaultContext(context.Background())
+	ctx := logger.NewContext(context.Background(), logger.New())
 	runCtx, cancel := context.WithCancel(ctx)
 	ts.cancel = cancel
 	m, err := newSiteManager(runCtx, o, fcrd)

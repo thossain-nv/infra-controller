@@ -6,12 +6,12 @@
 # PKI E2E Test Suite
 #
 # PURPOSE:
-# This script validates that the native Go PKI implementation correctly replaces
-# the embedded Vault dependency. It tests the full certificate lifecycle from
-# CA generation through service TLS termination.
+# This script validates that the cert manager's native PKI implementation
+# correctly replaces the embedded Vault dependency. It tests the full
+# certificate lifecycle from CA generation through service TLS termination.
 #
 # WHAT WE'RE TESTING:
-# 1. The cert-manager service can issue certificates using native Go crypto
+# 1. The cert-manager service can issue certificates using its built-in PKI
 # 2. cert-manager.io can request certs from our CA and create K8s secrets
 # 3. Services (like site-manager) can use those secrets for TLS
 # 4. The entire system works without Vault running
@@ -64,7 +64,7 @@ echo "=========================================="
 echo "PKI E2E Test Suite"
 echo "=========================================="
 echo ""
-echo "This tests the native Go PKI replacement for Vault."
+echo "This tests the native PKI replacement for Vault."
 echo "All tests must pass for the system to be production-ready."
 echo ""
 
@@ -725,5 +725,5 @@ fi
 
 echo "ALL TESTS PASSED"
 echo ""
-echo "The native Go PKI is working correctly."
+echo "The native PKI is working correctly."
 echo "Vault dependency has been successfully removed."

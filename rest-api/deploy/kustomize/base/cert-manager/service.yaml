@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# nico-rest-cert-manager Service (native Go PKI)
+# nico-rest-cert-manager Service: 8000 is the TLS listener, 8001 plain HTTP
 apiVersion: v1
 kind: Service
 metadata:

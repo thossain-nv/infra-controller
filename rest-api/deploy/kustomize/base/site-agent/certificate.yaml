@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # SPIFFE certificate for site-agent gRPC client connections to NICo/NICo API
-# Issued by nico-rest-ca-issuer (native Go PKI CA)
+# Issued by nico-rest-ca-issuer (the ca-signing-secret CA that
+# nico-rest-cert-manager also signs with)
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

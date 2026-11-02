@@ -57,6 +57,27 @@ jobs:
               - '.github/ci/prepare-rest-umbrella-chart.sh'
               - '.github/workflows/rest-*.yml'
               - 'helm/rest/**'
+              # Inputs of the nico-rest-cert-manager image, which is built from
+              # the Rust crate with the repository root as its build context:
+              # the crate, the workspace files, the root .dockerignore, and the
+              # crates it depends on through normal or build path dependencies
+              # (`cargo tree -p nico-rest-cert-manager -e normal,build`). Dev
+              # dependencies are not image inputs. Like every path in this
+              # filter, a change to one runs the full REST CI.
+              - 'crates/rest-api-cert-manager/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '.cargo/**'
+              - '.dockerignore'
+              - 'crates/version/**'
+              - 'crates/logfmt/**'
+              - 'crates/instrument/**'
+              - 'crates/instrument-macros/**'
+              - 'crates/observability-schema/**'
+              - 'crates/trace-propagation/**'
+              - 'crates/metrics-endpoint/**'
+              - 'crates/metrics-utils/**'
             core_proto:
               - 'crates/rpc/proto/**'
 

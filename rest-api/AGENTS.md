@@ -8,8 +8,10 @@ reuse, evidence, and verification.
 NICo REST is the Go management backend for multi-tenant bare-metal inventory,
 provisioning, and lifecycle operations. It coordinates Core through cloud/site
 Temporal workflows and an on-site agent, and includes IPAM, authentication,
-native PKI, component managers, and the `nicocli` CLI/TUI. APIs, configuration,
-and features are under active development and may change between releases.
+component managers, and the `nicocli` CLI/TUI. Native PKI lives in REST Cert
+Manager, a Rust crate that follows the root guidance instead of this file. APIs,
+configuration, and features are under active development and may change between
+releases.
 
 ## Find the owning code
 
@@ -26,13 +28,13 @@ go-sqlmock, testcontainers-go, and gomock.
 | Authentication and request audit redaction | `auth/`, `api/pkg/middleware/audit.go` |
 | DB models, transactions, migrations | `db/pkg/db/model/`, `db/pkg/db/tx.go`, `db/pkg/migrations/`, `db/cmd/migrations/` |
 | Shared utilities | `common/` |
-| Native PKI and site management | `cert-manager/`, `site-manager/` |
+| Native PKI and site management | `../crates/rest-api-cert-manager/`, `site-manager/` |
 | Cloud/site workflows and workers | `workflow/`, `site-workflow/`, `site-agent/` |
 | Core/Flow proto copies and generated clients | `proto/core/`, `proto/flow/` |
 | Flow, IPAM, component managers | `flow/`, `ipam/`, `nvswitch-manager/`, `powershelf-manager/` |
 | Published schema and Go clients | `openapi/spec.yaml`, `sdk/standard/`, `sdk/simple/` |
 | CLI/TUI | `cli/` |
-| Deployment, images, charts | `deploy/`, `docker/`, `../helm/rest/`, `temporal-helm/` |
+| Deployment, images, charts | `deploy/`, `docker/`, `../crates/rest-api-cert-manager/Dockerfile`, `../helm/rest/`, `temporal-helm/` |
 | Build and CI | `Makefile`, `../.github/workflows/rest-ci.yml`, `../.github/workflows/rest-lint-and-test.yml` |
 
 ## Build and verification
@@ -58,7 +60,7 @@ PostgreSQL container. Its defaults are `postgres:14.4-alpine` on port `30432`.
 | --- | --- |
 | `test-api`, `test-auth`, `test-db`, `test-flow`, `test-ipam`, `test-nvswitch-manager`, `test-powershelf-manager`, `test-workflow` | Call `ensure-postgres` before testing their packages |
 | `test-site-agent` | Starts mock Core/Flow gRPC servers; tests only `site-agent/pkg/components/...` with `CGO_ENABLED=1` and `-race` |
-| `test-common`, `test-cert-manager`, `test-site-manager`, `test-site-workflow`, `test-proto`, `test-sdk-simple`, `test-mcp` | Other package targets; see `Makefile` for their scope |
+| `test-common`, `test-site-manager`, `test-site-workflow`, `test-proto`, `test-sdk-simple`, `test-mcp` | Other package targets; see `Makefile` for their scope |
 | `test` | Runs its listed targets, not every package; CLI and the nested standard-SDK module are outside this target |
 
 Without mock servers, site-agent component tests retry on a `40s` backoff until

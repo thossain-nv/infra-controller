@@ -221,9 +221,10 @@ the compiler toolchains remain in build stages. DHCP uses the Kea version in
 `dev/docker/kea.version`, matching the compiler container.
 
 `Dockerfile.core` has separate targets for API, BMC proxy, DHCP,
-machine-a-tron, SSH console, and the MAT protocol gateway. Each target builds
-and packages its own binary (or DHCP hook library), sharing locked Cargo
-dependency and target caches. Tilt's Rust build stages use `line-tables-only`
+machine-a-tron, SSH console, the MAT protocol gateway, and the REST cert
+manager (`nico-rest-cert-manager`, a Rust binary deployed by the REST chart).
+Each target builds and packages its own binary (or DHCP hook library), sharing
+locked Cargo dependency and target caches. Tilt's Rust build stages use `line-tables-only`
 debug information for development and release profiles, retaining source-line
 backtraces without full debugger type and variable information. The API image
 contains a copy of nico-admin-cli for convenience.

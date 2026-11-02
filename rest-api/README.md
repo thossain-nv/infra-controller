@@ -260,7 +260,7 @@ done
 | nico-rest-db | `migrations` | Database migrations |
 | nico-rest-site-agent | `site-agent` | On-site agent |
 | nico-rest-site-manager | `sitemgr` | Site management service |
-| nico-rest-cert-manager | `credsmgr` | Native PKI certificate manager |
+| nico-rest-cert-manager | `nico-rest-cert-manager` | Native PKI certificate manager, written in Rust ([`crates/rest-api-cert-manager`](../crates/rest-api-cert-manager/)) |
 | nico-cli | `nicocli` | [CLI client](cli/README.md) for the REST API |
 
 Supporting modules:

@@ -4,61 +4,56 @@
 package sitemgr
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/certs"
-	"github.com/NVIDIA/infra-controller/rest-api/cert-manager/pkg/core"
-	crdclient "github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/client/clientset/versioned"
-	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"k8s.io/client-go/rest"
+
+	"github.com/NVIDIA/infra-controller/rest-api/site-manager/internal/logger"
+	"github.com/NVIDIA/infra-controller/rest-api/site-manager/internal/middleware"
+	"github.com/NVIDIA/infra-controller/rest-api/site-manager/internal/server"
+	crdclient "github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/client/clientset/versioned"
+	"github.com/NVIDIA/infra-controller/rest-api/site-manager/pkg/metadata"
 )
 
 const (
-	vaultTimeout      = 20 * time.Second
-	oneYrHours        = 365 * 24
-	mgrCertFile       = "/tmp/mgr.cert"
-	mgrKeyFile        = "/tmp/mgr.key"
-	crdClientName     = "site-crd-client"
-	certMgrClientName = "cert-manager-client"
+	oneYrHours    = 365 * 24
+	mgrCertFile   = "/tmp/mgr.cert"
+	mgrKeyFile    = "/tmp/mgr.key"
+	crdClientName = "site-crd-client"
 )
 
 // Options are args passed to the site manager at boot
 type Options struct {
-	credsMgrURL string
-	// credsMgrCAPath is the CA bundle used to verify credsMgrURL. It is the
-	// ca.crt of the same CA that signs the cert-manager's listener, so the
+	certManagerURL string
+	// certManagerCAPath is the CA bundle used to verify certManagerURL. It is
+	// the ca.crt of the same CA that signs the Cert Manager's listener, so the
 	// certificate chain and the hostname both have to check out.
-	credsMgrCAPath string
-	ingressHost    string
-	listenPort     string
-	tlsKeyPath     string
-	tlsCertPath    string
-	namespace      string
-	sentryDSN      string
+	certManagerCAPath string
+	ingressHost       string
+	listenPort        string
+	tlsKeyPath        string
+	tlsCertPath       string
+	namespace         string
 }
 
 // SiteMgr defines an instance of site manager
 type SiteMgr struct {
 	Options
-	crdClient  crdclient.Interface
-	appService *core.HTTPService
-	certClient *http.Client
-	log        *logrus.Entry
-	l          net.Listener
+	crdClient         crdclient.Interface
+	appService        *server.HTTPService
+	certManagerClient *http.Client
+	log               *logrus.Entry
+	l                 net.Listener
 }
 
 // NewSiteManager creates an instance of SiteMgr
@@ -81,26 +76,19 @@ func NewSiteManager(ctx context.Context, o Options) (*SiteMgr, error) {
 		return nil, errors.Wrap(err, "crdclient.NewForConfig(cfg)")
 	}
 
-	if o.sentryDSN != "" {
-		sentry.Init(sentry.ClientOptions{
-			Dsn:   o.sentryDSN,
-			Debug: true,
-		})
-	}
-
 	return newSiteManager(ctx, o, c)
 }
 
 func newSiteManager(ctx context.Context, o Options, c crdclient.Interface) (*SiteMgr, error) {
-	certClient, err := newCertManagerClient(o.credsMgrCAPath)
+	certManagerClient, err := newCertManagerClient(o.certManagerCAPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "newCertManagerClient")
 	}
 
 	s := &SiteMgr{
-		Options:    o,
-		certClient: certClient,
-		log:        core.GetLogger(ctx),
+		Options:           o,
+		certManagerClient: certManagerClient,
+		log:               logger.FromContext(ctx),
 	}
 
 	s.crdClient = c
@@ -110,11 +98,11 @@ func newSiteManager(ctx context.Context, o Options, c crdclient.Interface) (*Sit
 		return nil, errors.Wrap(err, "tlsSetup")
 	}
 	addr := fmt.Sprintf(":%s", s.listenPort)
-	appService := core.NewTLSService(addr, s.tlsCertPath, s.tlsKeyPath)
-	appService.AddHealthRoute(ctx)
-	appService.AddVersionRoute(ctx)
-	appService.AddMetricsRoute(ctx)
-	appService.Use(core.NewHTTPMiddleware(ctx, core.WithRequestMetrics("nico_rest_site_manager"))...)
+	appService := server.NewTLSService(addr, s.tlsCertPath, s.tlsKeyPath)
+	appService.AddHealthRoute()
+	appService.AddVersionRoute(metadata.Version)
+	appService.AddMetricsRoute()
+	appService.Use(middleware.New(s.log, "nico_rest_site_manager")...)
 	appService.Path("/v1/site").Handler(s.siteCreateHandler()).Methods("POST")
 	appService.Path("/v1/site/{uuid}").Handler(s.siteGetHandler()).Methods("GET")
 	appService.Path("/v1/site/roll/{uuid}").Handler(s.siteRollHandler()).Methods("POST")
@@ -134,39 +122,6 @@ func (s *SiteMgr) Start(ctx context.Context) {
 	s.l = l
 }
 
-// newCertManagerClient builds the HTTP client used to reach
-// nico-rest-cert-manager. The CA bundle at caPath is the only trust anchor, so
-// an unreadable or malformed file is a startup failure rather than a silent
-// downgrade to an unverified connection.
-func newCertManagerClient(caPath string) (*http.Client, error) {
-	if caPath == "" {
-		return nil, fmt.Errorf("a CA bundle path is required to verify the cert manager endpoint")
-	}
-
-	caPEM, err := os.ReadFile(caPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "read cert manager CA bundle %q", caPath)
-	}
-
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(caPEM) {
-		return nil, fmt.Errorf("cert manager CA bundle %q contains no certificates", caPath)
-	}
-
-	return &http.Client{
-		Timeout: vaultTimeout,
-		// wrap transport with otel
-		Transport: otelhttp.NewTransport(&http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:    pool,
-				MinVersion: tls.VersionTLS12,
-			},
-		}, otelhttp.WithSpanNameFormatter(func(_ string, _ *http.Request) string {
-			return certMgrClientName
-		})),
-	}, nil
-}
-
 func (s *SiteMgr) tlsSetup(ctx context.Context) error {
 	log := s.log
 	if s.tlsCertPath != "" && s.tlsKeyPath != "" {
@@ -174,10 +129,10 @@ func (s *SiteMgr) tlsSetup(ctx context.Context) error {
 		return nil
 	}
 
-	log.Infof("Setting up TLS Config using vault service")
+	log.Infof("Setting up TLS Config using Cert Manager")
 
 	var (
-		resp *certs.CertificateResponse
+		resp *certificateResponse
 		err  error
 	)
 
@@ -204,107 +159,33 @@ func (s *SiteMgr) tlsSetup(ctx context.Context) error {
 	return nil
 }
 
-func (s *SiteMgr) getCertificate(ctx context.Context, name, app string, ttl int) (*certs.CertificateResponse, error) {
-	body := &certs.CertificateRequest{
-		Name: name,
-		App:  app,
-		TTL:  ttl,
-	}
-
-	payloadBuf := new(bytes.Buffer)
-	err := json.NewEncoder(payloadBuf).Encode(body)
-	if err != nil {
-		return nil, errors.Wrap(err, "json encode payload")
-	}
-	url := s.credsMgrURL + "/v1/pki/cloud-cert"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payloadBuf)
-	content, err := s.roundTrip(req)
-	if err != nil {
-		return nil, errors.Wrap(err, "s.roundTrip(req)")
-	}
-
-	if content == nil {
-		return nil, fmt.Errorf("empty response")
-	}
-
-	creds := &certs.CertificateResponse{}
-	err = json.Unmarshal(content, &creds)
-	if err != nil {
-		return nil, errors.Wrap(err, "s.json.Unmarshal")
-	}
-	return creds, nil
-}
-func (s *SiteMgr) getCA(ctx context.Context) (string, error) {
-	url := s.credsMgrURL + "/v1/pki/ca/pem"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	content, err := s.roundTrip(req)
-	if err != nil {
-		return "", errors.Wrap(err, "s.roundTrip(req)")
-	}
-
-	if content == nil {
-		return "", fmt.Errorf("empty response")
-	}
-
-	return string(content), nil
-}
-
-func (s *SiteMgr) roundTrip(req *http.Request) ([]byte, error) {
-	resp, err := s.certClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusIMUsed {
-		content, _ := io.ReadAll(resp.Body)
-		err = fmt.Errorf("%s, %s", resp.Status, content)
-		return nil, err
-	}
-
-	if resp.StatusCode == http.StatusNoContent {
-		return nil, nil
-	}
-
-	return io.ReadAll(resp.Body)
-}
-
 func (s *SiteMgr) siteCreateHandler() http.Handler {
 	h := &createHandler{manager: s}
-	return s.withWraps(h, "csm-site-create")
+	return otelhttp.NewHandler(h, "csm-site-create")
 }
 
 func (s *SiteMgr) siteDeleteHandler() http.Handler {
 	h := &deleteHandler{manager: s}
-	return s.withWraps(h, "csm-site-delete")
+	return otelhttp.NewHandler(h, "csm-site-delete")
 }
 
 func (s *SiteMgr) siteGetHandler() http.Handler {
 	h := &getHandler{manager: s}
-	return s.withWraps(h, "csm-site-get")
+	return otelhttp.NewHandler(h, "csm-site-get")
 }
 
 func (s *SiteMgr) siteRegisterHandler() http.Handler {
 	h := &registerHandler{manager: s}
-	return s.withWraps(h, "csm-site-register")
+	return otelhttp.NewHandler(h, "csm-site-register")
 }
 func (s *SiteMgr) siteRollHandler() http.Handler {
 	h := &rollHandler{manager: s}
-	return s.withWraps(h, "csm-site-roll")
+	return otelhttp.NewHandler(h, "csm-site-roll")
 }
 
 func (s *SiteMgr) siteCredsHandler() http.Handler {
 	h := &credsHandler{manager: s}
-	return s.withWraps(h, "csm-site-bootstrap")
-}
-
-// withWraps applies the required wrappers to the handlers
-func (s *SiteMgr) withWraps(h http.Handler, oper string) http.Handler {
-	oh := otelhttp.NewHandler(h, oper)
-	if s.sentryDSN != "" {
-		return &sentryWrap{h: oh}
-	}
-
-	return oh
+	return otelhttp.NewHandler(h, "csm-site-bootstrap")
 }
 
 func (s *SiteMgr) writeJSONResp(w http.ResponseWriter, resp interface{}) {

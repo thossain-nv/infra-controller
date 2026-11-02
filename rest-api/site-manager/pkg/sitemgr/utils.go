@@ -70,6 +70,10 @@ func GetSiteOTP(ctx context.Context, logger zerolog.Logger, uuid, url string) (*
 	}
 	defer resp.Body.Close()
 	c, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to read Site Manager response body")
+		return nil, nil, err
+	}
 
 	var siteResp csmtypes.SiteGetResponse
 	err = json.Unmarshal(c, &siteResp)
