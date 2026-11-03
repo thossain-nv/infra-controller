@@ -66,9 +66,8 @@ pub(super) async fn serve(
         }
     };
 
-    tokio::select! {
-        served = &mut serving => return served,
-        () = cancel.cancelled() => {}
+    if let Some(served) = cancel.run_until_cancelled(&mut serving).await {
+        return served;
     }
     // Idle connections close right away while requests in flight finish. The
     // server closes anything still open after the drain timeout.

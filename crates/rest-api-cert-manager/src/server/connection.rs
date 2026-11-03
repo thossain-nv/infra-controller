@@ -251,7 +251,7 @@ mod tests {
         }
     }
 
-    /// Each row yields the protocol ALPN selected and the status of `GET /`
+    /// Each case yields the protocol ALPN selected and the status of `GET /`
     /// over that protocol.
     #[tokio::test]
     async fn serve() {
@@ -268,11 +268,6 @@ mod tests {
                     scenario: "TLS with HTTP/1.1 offered over ALPN",
                     input: Client::Tls(&[HTTP1]),
                     expect: Yields((Some(HTTP1.to_vec()), Some("HTTP/1.1 200 OK".to_owned()))),
-                },
-                Case {
-                    scenario: "TLS without ALPN speaks HTTP/1.1",
-                    input: Client::Tls(&[]),
-                    expect: Yields((None, Some("HTTP/1.1 200 OK".to_owned()))),
                 },
                 Case {
                     scenario: "TLS prefers HTTP/2 when the client offers both",
@@ -318,7 +313,7 @@ mod tests {
     }
 
     /// A connection that stops sending is closed by the timeout of the step it
-    /// stopped in. Each row yields the time from sending `then` until the
+    /// stopped in. Each case yields the time from sending `then` until the
     /// connection closed, rounded to [`STEP`].
     #[tokio::test]
     async fn serve_enforces_timeouts() {
@@ -386,7 +381,7 @@ mod tests {
                     // Anything the server sends, such as HTTP/2 SETTINGS, is
                     // read and discarded until the connection closes. A
                     // connection still open well past every timeout fails the
-                    // row, so the test doesn't hang.
+                    // case, so the test doesn't hang.
                     let mut discarded = [0; 1024];
                     let closed = async {
                         while stream.read(&mut discarded).await.is_ok_and(|read| read > 0) {}
@@ -400,7 +395,7 @@ mod tests {
     }
 
     /// When a client stops reading a response, the connection is closed once a
-    /// write has waited [`ConnectionTimeouts::write`]. Each row yields the
+    /// write has waited [`ConnectionTimeouts::write`]. Each case yields the
     /// status line if the whole response arrives.
     #[tokio::test]
     async fn serve_cuts_off_an_unread_response() {

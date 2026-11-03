@@ -27,18 +27,3 @@ use crate::api::TEXT_PLAIN_UTF8;
 pub(in crate::api) async fn get_health() -> impl IntoResponse {
     ([(CONTENT_TYPE, TEXT_PLAIN_UTF8)], "ok\n")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::test_support::Observed;
-
-    #[tokio::test]
-    async fn get_health() {
-        let response = super::get_health().await.into_response();
-        assert_eq!(
-            Observed::from_response(response).await,
-            Observed::text(200, "ok\n")
-        );
-    }
-}

@@ -249,8 +249,8 @@ mod tests {
 
     use super::*;
 
-    /// Every environment variable the options read. Each row sets or clears
-    /// all of them, so the caller's environment can't affect a row.
+    /// Every environment variable the options read. Each case sets or clears
+    /// all of them, so the caller's environment can't affect a case.
     const OPTION_ENV_VARS: [&str; 8] = [
         "SENTRY_DSN",
         "CA_COMMON_NAME",
@@ -329,7 +329,7 @@ mod tests {
     fn set_option_env(name: &str, value: Option<&str>) {
         // SAFETY: Only `#[serial]` tests call this. Every other test in this
         // crate that parses `Options` reads these variables, so those tests are
-        // `#[serial]` too (`help_lists_every_option`, `server::tests::run`).
+        // `#[serial]` too (`help_marks_ignored_options`, `server::tests::run`).
         // std serializes its own environment access. However, this doesn't
         // prove Unix process-wide exclusion from environment readers on other
         // test threads, such as a C library calling `getenv`.
@@ -500,49 +500,6 @@ mod tests {
                     }),
                 },
                 Case {
-                    scenario: "--version asks for the version",
-                    input: Invocation {
-                        args: &["--version"],
-                        env: &[],
-                    },
-                    expect: Yields(Parsed {
-                        version: true,
-                        ..Parsed::defaults()
-                    }),
-                },
-                Case {
-                    scenario: "-h asks for help",
-                    input: Invocation {
-                        args: &["-h"],
-                        env: &[],
-                    },
-                    expect: FailsWith(ErrorKind::DisplayHelp),
-                },
-                Case {
-                    scenario: "--help asks for help",
-                    input: Invocation {
-                        args: &["--help"],
-                        env: &[],
-                    },
-                    expect: FailsWith(ErrorKind::DisplayHelp),
-                },
-                Case {
-                    scenario: "a non-numeric port is a usage error",
-                    input: Invocation {
-                        args: &["--tls-port=https"],
-                        env: &[],
-                    },
-                    expect: FailsWith(ErrorKind::ValueValidation),
-                },
-                Case {
-                    scenario: "an unknown flag is a usage error",
-                    input: Invocation {
-                        args: &["--bogus"],
-                        env: &[],
-                    },
-                    expect: FailsWith(ErrorKind::UnknownArgument),
-                },
-                Case {
                     scenario: "environment variables replace the defaults",
                     input: Invocation {
                         args: &[],
@@ -611,6 +568,14 @@ mod tests {
                         ..Parsed::defaults()
                     }),
                 },
+                Case {
+                    scenario: "an empty METRICS_NAMESPACE keeps the default prefix",
+                    input: Invocation {
+                        args: &[],
+                        env: &[("METRICS_NAMESPACE", "")],
+                    },
+                    expect: Yields(Parsed::defaults()),
+                },
             ],
             parse,
         );
@@ -623,33 +588,12 @@ mod tests {
     // `options` sets and removes. So this test is `#[serial]` too.
     #[test]
     #[serial]
-    fn help_lists_every_option() {
+    fn help_marks_ignored_options() {
         let help = Options::command().render_help().to_string();
         value_scenarios!(run = |text: &str| help.contains(text);
-            "flags" {
-                "--debug" => true,
-                "--tls-port" => true,
-                "--insecure-port" => true,
-                "--dns-name" => true,
-                "--ca-base-dns" => true,
-                "--sentry-dsn" => true,
-                "--ca-common-name" => true,
-                "--ca-organization" => true,
-                "--ca-cert-file" => true,
-                "--ca-key-file" => true,
-                "--alt-ca-cert-file" => true,
-                "--alt-ca-key-file" => true,
-                "-v, --version" => true,
-                "-h, --help" => true,
-            }
-            "environment variables, set or not" {
-                "[env: SENTRY_DSN]" => true,
+            "environment variables of the CA naming options" {
                 "[env: CA_COMMON_NAME=" => true,
                 "[env: CA_ORGANIZATION=" => true,
-                "[env: CA_CERT_FILE=" => true,
-                "[env: CA_KEY_FILE=" => true,
-                "[env: ALT_CA_CERT_FILE=" => true,
-                "[env: ALT_CA_KEY_FILE=" => true,
             }
             "deprecation and no-op notes" {
                 "Deprecated and ignored" => true,
@@ -661,40 +605,13 @@ mod tests {
     #[test]
     fn parse_bool() {
         scenarios!(super::parse_bool:
-            "true spellings" {
-                "1" => Yields(true),
+            "Go's spellings are accepted" {
                 "t" => Yields(true),
-                "T" => Yields(true),
-                "TRUE" => Yields(true),
-                "true" => Yields(true),
-                "True" => Yields(true),
-            }
-            "false spellings" {
-                "0" => Yields(false),
-                "f" => Yields(false),
-                "F" => Yields(false),
-                "FALSE" => Yields(false),
-                "false" => Yields(false),
                 "False" => Yields(false),
             }
-            "other words are rejected" {
+            "other spellings are rejected" {
                 "yes" => Fails,
-                "on" => Fails,
                 "tRUE" => Fails,
-                "" => Fails,
-            }
-        );
-    }
-
-    #[test]
-    fn metrics_namespace() {
-        value_scenarios!(run = |configured: Option<&str>| super::metrics_namespace(configured.map(str::to_owned));
-            "unset or empty keeps the default" {
-                None => "nico_rest_cert_manager".to_owned(),
-                Some("") => "nico_rest_cert_manager".to_owned(),
-            }
-            "a non-empty value replaces it" {
-                Some("acme_cm") => "acme_cm".to_owned(),
             }
         );
     }

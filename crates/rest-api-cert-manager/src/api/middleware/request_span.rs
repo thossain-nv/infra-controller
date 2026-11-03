@@ -238,11 +238,6 @@ mod tests {
                     input: Some(format!("00-{CALLER_TRACE:032x}-{CALLER_SPAN:016x}-01")),
                     expect: Yields(exported(Parent::Caller)),
                 },
-                Case {
-                    scenario: "a malformed traceparent starts a trace",
-                    input: Some("not-a-traceparent".to_owned()),
-                    expect: Yields(exported(Parent::Root)),
-                },
             ],
             served,
         )

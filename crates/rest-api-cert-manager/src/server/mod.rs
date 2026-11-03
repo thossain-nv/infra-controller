@@ -34,7 +34,7 @@ use std::sync::Arc;
 
 use axum_server::tls_rustls::RustlsConfig;
 use tokio::net::TcpListener;
-use tokio::task::{JoinError, JoinSet};
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 
 use crate::api::{self, AppState, MetricsError, RequestMetrics};
@@ -80,15 +80,11 @@ pub(crate) enum ServerError {
         listen_address: SocketAddr,
         error: std::io::Error,
     },
-    #[error("startup task failed: {0}")]
-    StartupTask(JoinError),
     #[error("the {listener} listener failed: {error}")]
     Serve {
         listener: Listener,
         error: std::io::Error,
     },
-    #[error("listener task failed: {0}")]
-    ListenerTask(JoinError),
 }
 
 /// Serves until `cancel` is cancelled and both listeners have drained. It
@@ -109,8 +105,10 @@ pub(crate) async fn run(options: &Options, cancel: CancellationToken) -> Result<
         Ok::<_, ServerError>((certificate_authority, serving_certificate))
     })
     .await;
+    // Nothing aborts this task or the listener tasks, so a `JoinError` means a
+    // task panicked. The panic continues here, like `JoinSet::join_all` does.
     let (certificate_authority, serving_certificate) =
-        identity.map_err(ServerError::StartupTask)??;
+        identity.unwrap_or_else(|error| std::panic::resume_unwind(error.into_panic()))?;
     let tls_config = RustlsConfig::from_config(Arc::new(tls::server_config(&serving_certificate)?));
 
     let state = AppState {
@@ -163,10 +161,7 @@ pub(crate) async fn run(options: &Options, cancel: CancellationToken) -> Result<
     // listener is stopped too.
     let mut failure = None;
     while let Some(joined) = listeners.join_next().await {
-        let served = match joined {
-            Ok(served) => served,
-            Err(error) => Err(ServerError::ListenerTask(error)),
-        };
+        let served = joined.unwrap_or_else(|error| std::panic::resume_unwind(error.into_panic()));
         if let Err(error) = served {
             cancel.cancel();
             failure.get_or_insert(error);
@@ -219,7 +214,7 @@ mod tests {
             .unwrap();
         let occupied_port = occupied.local_addr().unwrap().port();
 
-        // Every row sets both CA pairs with flags, so no environment variable
+        // Every case sets both CA pairs with flags, so no environment variable
         // is used.
         let args = |extra: &[&str]| -> Vec<String> {
             [

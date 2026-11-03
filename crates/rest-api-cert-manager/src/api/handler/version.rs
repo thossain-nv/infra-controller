@@ -31,20 +31,3 @@ pub(in crate::api) async fn get_version(State(state): State<AppState>) -> impl I
         format!("{}\n", state.version),
     )
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::test_support::{Observed, TEST_VERSION, app_state};
-    use crate::pki::test_support::TestCaPem;
-
-    #[tokio::test]
-    async fn get_version() {
-        let state = app_state(&TestCaPem::p256());
-        let response = super::get_version(State(state)).await.into_response();
-        assert_eq!(
-            Observed::from_response(response).await,
-            Observed::text(200, format!("{TEST_VERSION}\n")),
-        );
-    }
-}

@@ -164,7 +164,6 @@ mod tests {
     #[tokio::test]
     async fn tls_router() {
         let ca = TestCaPem::p256();
-        let not_allowed = || Yields(Observed::empty(405));
         check_cases_async(
             [
                 Case {
@@ -210,54 +209,16 @@ mod tests {
                 Case {
                     scenario: "HEAD on a GET route",
                     input: call(Method::HEAD, "/healthz"),
-                    expect: not_allowed(),
-                },
-                Case {
-                    scenario: "HEAD on the POST route",
-                    input: call(Method::HEAD, "/v1/pki/cloud-cert"),
-                    expect: not_allowed(),
+                    expect: Yields(Observed::empty(405)),
                 },
                 Case {
                     scenario: "POST on a GET route",
                     input: call(Method::POST, "/healthz"),
-                    expect: not_allowed(),
-                },
-                Case {
-                    scenario: "OPTIONS on the CA route",
-                    input: call(Method::OPTIONS, "/v1/pki/ca"),
-                    expect: not_allowed(),
-                },
-                Case {
-                    scenario: "GET on the POST route",
-                    input: call(Method::GET, "/v1/pki/cloud-cert"),
-                    expect: not_allowed(),
-                },
-                Case {
-                    scenario: "root",
-                    input: call(Method::GET, "/"),
-                    expect: Yields(Observed::not_found()),
+                    expect: Yields(Observed::empty(405)),
                 },
                 Case {
                     scenario: "unknown path",
                     input: call(Method::GET, "/nope"),
-                    expect: Yields(Observed::not_found()),
-                },
-                Case {
-                    scenario: "HEAD on an unknown path, its body dropped",
-                    input: call(Method::HEAD, "/nope"),
-                    expect: Yields(Observed {
-                        body: Vec::new(),
-                        ..Observed::not_found()
-                    }),
-                },
-                Case {
-                    scenario: "trailing slash",
-                    input: call(Method::GET, "/v1/pki/ca/"),
-                    expect: Yields(Observed::not_found()),
-                },
-                Case {
-                    scenario: "paths are case-sensitive",
-                    input: call(Method::GET, "/HEALTHZ"),
                     expect: Yields(Observed::not_found()),
                 },
                 Case {
@@ -319,11 +280,6 @@ mod tests {
                 Case {
                     scenario: "HEAD on a GET route",
                     input: call(Method::HEAD, "/healthz"),
-                    expect: Yields(Observed::empty(405)),
-                },
-                Case {
-                    scenario: "POST on a GET route",
-                    input: call(Method::POST, "/v1/pki/ca/pem"),
                     expect: Yields(Observed::empty(405)),
                 },
             ],

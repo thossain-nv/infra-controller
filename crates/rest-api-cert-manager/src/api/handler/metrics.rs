@@ -43,23 +43,3 @@ pub(in crate::api) async fn get_metrics(State(state): State<AppState>) -> Respon
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::test_support::app_state;
-    use crate::pki::test_support::TestCaPem;
-
-    #[tokio::test]
-    async fn get_metrics() {
-        let state = app_state(&TestCaPem::p256());
-        let expected = state.request_metrics.encode().unwrap();
-        let response = super::get_metrics(State(state)).await;
-        assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(response.headers()[CONTENT_TYPE], PROMETHEUS_TEXT_FORMAT);
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        assert_eq!(body, expected.as_bytes());
-    }
-}

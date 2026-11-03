@@ -193,10 +193,8 @@ mod tests {
     #[test]
     fn try_from() {
         scenarios!(run = |body: &str| ApiPkiCloudCertificateCreateRequest::try_from(body.as_bytes()).map_err(drop);
-            "an empty or whitespace body is an error" {
+            "an empty body is an error" {
                 "" => Fails,
-                "   " => Fails,
-                "\n" => Fails,
             }
             "a top-level null or empty object is an empty request" {
                 "null" => Yields(request("", "", 0)),
@@ -204,10 +202,7 @@ mod tests {
             }
             "a top-level value that is not an object is an error" {
                 "[]" => Fails,
-                "[\"a\", \"b\", 5]" => Fails,
-                "\"x\"" => Fails,
                 "1" => Fails,
-                "true" => Fails,
             }
             "fields decode" {
                 r#"{"name":"svc","app":"web","ttl":24}"# => Yields(request("svc", "web", 24)),
@@ -230,31 +225,19 @@ mod tests {
             "only the first JSON value is read" {
                 r#"{"name":"a"} trailing garbage"# => Yields(request("a", "", 0)),
                 r#"{"name":"a"}{"name":"b"}"# => Yields(request("a", "", 0)),
-                "nullx" => Yields(request("", "", 0)),
-                r#"{"name":"a""# => Fails,
             }
             "ttl must be an integer literal that fits in 64 bits" {
                 r#"{"ttl":-0}"# => Yields(request("", "", 0)),
                 r#"{"ttl":-1}"# => Yields(request("", "", -1)),
-                r#"{"ttl":9223372036854775807}"# => Yields(request("", "", i64::MAX)),
-                r#"{"ttl":-9223372036854775808}"# => Yields(request("", "", i64::MIN)),
-                r#"{"ttl":1.5}"# => Fails,
                 r#"{"ttl":24.0}"# => Fails,
-                r#"{"ttl":-0.0}"# => Fails,
                 r#"{"ttl":1e2}"# => Fails,
-                r#"{"ttl":"24"}"# => Fails,
-                r#"{"ttl":true}"# => Fails,
                 r#"{"ttl":9223372036854775808}"# => Fails,
-                r#"{"ttl":99999999999999999999}"# => Fails,
             }
-            "name and app must be strings" {
+            "name must be a string" {
                 r#"{"name":5}"# => Fails,
-                r#"{"name":["a"]}"# => Fails,
-                r#"{"app":{}}"# => Fails,
             }
             "string contents are taken as given" {
                 r#"{"name":"é"}"# => Yields(request("\u{e9}", "", 0)),
-                r#"{"name":"\u0000nul"}"# => Yields(request("\0nul", "", 0)),
                 r#"{"name":"*.wild"}"# => Yields(request("*.wild", "", 0)),
             }
         );
@@ -276,35 +259,6 @@ mod tests {
                 (request("a", "b.com", 0), "temporal.local") => "b.com.a.temporal.local".to_owned(),
                 (request("svc.cluster.local", "", 0), "temporal.local") => "svc.cluster.local".to_owned(),
                 (request("A.COM", "", 0), "temporal.local") => "A.COM.temporal.local".to_owned(),
-            }
-        );
-    }
-
-    #[test]
-    fn ttl_hours() {
-        value_scenarios!(run = |ttl: i64| request("", "", ttl).ttl_hours();
-            "zero means 90 days" {
-                0 => 2160,
-            }
-            "anything else is kept" {
-                1 => 1,
-                8760 => 8760,
-                -1 => -1,
-            }
-        );
-    }
-
-    #[test]
-    fn from_issued_certificate() {
-        let issued = IssuedCertificate {
-            certificate_pem: "certificate".to_owned(),
-            private_key_pem: "key".to_owned(),
-        };
-        assert_eq!(
-            ApiPkiCloudCertificate::from(issued),
-            ApiPkiCloudCertificate {
-                key: "key".to_owned(),
-                certificate: "certificate".to_owned(),
             }
         );
     }

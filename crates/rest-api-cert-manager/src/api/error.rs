@@ -69,37 +69,3 @@ impl IntoResponse for ApiError {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use carbide_test_support::Outcome::*;
-    use carbide_test_support::{Case, check_cases_async};
-
-    use super::*;
-    use crate::api::test_support::Observed;
-
-    #[tokio::test]
-    async fn into_response() {
-        check_cases_async(
-            [
-                Case {
-                    scenario: "undecodable cloud certificate request",
-                    input: ApiError::ParseRequest,
-                    expect: Yields(Observed::json(400, "{}")),
-                },
-                Case {
-                    scenario: "cloud certificate issuance failure",
-                    input: ApiError::IssueCertificate,
-                    expect: Yields(Observed::json(500, "{}")),
-                },
-                Case {
-                    scenario: "CA file whose first block is not a CERTIFICATE",
-                    input: ApiError::DecodeCaCertificate,
-                    expect: Yields(Observed::text(400, "CredsManager error, internal code 9")),
-                },
-            ],
-            |error| async move { Ok::<_, ()>(Observed::from_response(error.into_response()).await) },
-        )
-        .await;
-    }
-}

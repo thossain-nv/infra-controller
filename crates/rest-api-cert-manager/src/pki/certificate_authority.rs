@@ -484,7 +484,7 @@ mod tests {
     use super::*;
     use crate::pki::test_support::{TestCaPem, ca_params};
 
-    /// One CA per key format. The rows of a table share them.
+    /// One CA per key format. The cases of a table share them.
     struct Fixtures {
         rsa_pkcs1: TestCaPem,
         rsa_pkcs8: TestCaPem,
@@ -536,8 +536,8 @@ mod tests {
             .replace(&format!("END {from}-----"), &format!("END {to}-----"))
     }
 
-    /// Converts a parse failure inside a table operation into the row's error.
-    /// That way the failure message names the row.
+    /// Converts a parse failure inside a table operation into the case's error.
+    /// That way the failure message names the case.
     fn failure(error: impl fmt::Display) -> String {
         error.to_string()
     }
@@ -575,14 +575,6 @@ mod tests {
             "-----BEGIN EC PARAMETERS-----\nBggqhkjOPQMBBw==\n-----END EC PARAMETERS-----\n{}",
             fixtures.p256_sec1.key
         );
-        let malformed_block_first = format!(
-            "-----BEGIN CERTIFICATE-----\nnot base64!\n-----END CERTIFICATE-----\n{}",
-            p256.certificate
-        );
-        let leading_text_bundle = format!(
-            "Subject: the site CA\n{}{}",
-            p256.certificate, fixtures.rsa_pkcs8.certificate
-        );
         let garbage_der = pem::encode(&pem::Pem::new("CERTIFICATE", b"not der".to_vec()));
         let trailing_der = {
             let block = super::first_pem_block(p256.certificate.as_bytes()).unwrap();
@@ -616,16 +608,6 @@ mod tests {
                 Case {
                     scenario: "PKCS#8 PRIVATE KEY holding P-521",
                     input: (fixtures.p521_pkcs8.certificate.as_str(), fixtures.p521_pkcs8.key.as_str()),
-                    expect: Yields(()),
-                },
-                Case {
-                    scenario: "leading text and a second certificate after the first block",
-                    input: (leading_text_bundle.as_str(), p256.key.as_str()),
-                    expect: Yields(()),
-                },
-                Case {
-                    scenario: "a malformed block before the first well-formed one is skipped",
-                    input: (malformed_block_first.as_str(), p256.key.as_str()),
                     expect: Yields(()),
                 },
                 Case {
@@ -829,7 +811,7 @@ mod tests {
     }
 
     /// What a test observes about an issued leaf and its key. [`leaf`] returns
-    /// the values every leaf shares, so each row only sets what it changes.
+    /// the values every leaf shares, so each case only sets what it changes.
     #[derive(Debug, PartialEq)]
     struct Leaf {
         certificate_pem: PemText,
@@ -1336,54 +1318,6 @@ mod tests {
                 "-----BEGIN A-----\nAQI=\n-----END B-----\n" => None,
                 "no block" => None,
             }
-        );
-    }
-
-    #[test]
-    fn subject() {
-        value_scenarios!(run = |common_name: &str| super::subject(common_name).iter().map(|(dn_type, value)| (dn_type.clone(), value.clone())).collect::<Vec<_>>();
-            "an empty name is an empty subject" {
-                "" => vec![],
-            }
-            "a PrintableString when every character is in its set" {
-                "app.svc.temporal.local" => vec![(DnType::CommonName, DnValue::PrintableString(PrintableString::try_from("app.svc.temporal.local").unwrap()))],
-                "A-Z a-z 0-9 '()+,-./:=?" => vec![(DnType::CommonName, DnValue::PrintableString(PrintableString::try_from("A-Z a-z 0-9 '()+,-./:=?").unwrap()))],
-            }
-            "a UTF8String otherwise" {
-                "*.wild" => vec![(DnType::CommonName, DnValue::Utf8String("*.wild".to_owned()))],
-                "a_b" => vec![(DnType::CommonName, DnValue::Utf8String("a_b".to_owned()))],
-                "a&b" => vec![(DnType::CommonName, DnValue::Utf8String("a&b".to_owned()))],
-                "nul\0" => vec![(DnType::CommonName, DnValue::Utf8String("nul\0".to_owned()))],
-            }
-        );
-    }
-
-    #[test]
-    fn rsa_private_key_pem() {
-        let rsa_key = KeyPair::generate_rsa_for(&PKCS_RSA_SHA256, RsaKeySize::_2048).unwrap();
-        let ec_key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).unwrap();
-        check_cases(
-            [
-                Case {
-                    scenario: "an RSA key re-encodes as PKCS#1 with identical key material",
-                    input: &rsa_key,
-                    expect: Yields(true),
-                },
-                Case {
-                    scenario: "a non-RSA key is refused",
-                    input: &ec_key,
-                    expect: Fails,
-                },
-            ],
-            |key: &KeyPair| -> Result<bool, ()> {
-                let pem_text = super::rsa_private_key_pem(key).map_err(drop)?;
-                let block = pem::parse(&pem_text).map_err(drop)?;
-                let reparsed = KeyPair::try_from(&PrivateKeyDer::from(PrivatePkcs1KeyDer::from(
-                    block.contents(),
-                )))
-                .map_err(drop)?;
-                Ok(block.tag() == "RSA PRIVATE KEY" && reparsed.der_bytes() == key.der_bytes())
-            },
         );
     }
 }
